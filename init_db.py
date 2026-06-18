@@ -1,0 +1,5 @@
+from db.database import create_table
+
+create_table()
+
+print("Database Created Successfully")

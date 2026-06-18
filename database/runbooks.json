@@ -1,0 +1,77 @@
+[
+    {
+        "id": 1,
+        "category": "Database",
+        "content": "Check VPN connectivity. Verify database server status. Confirm network routes. Validate database credentials. Review database logs."
+    },
+    {
+        "id": 2,
+        "category": "Schema",
+        "content": "Verify column names. Compare source and target schema. Check schema version. Update ETL mappings if columns changed."
+    },
+    {
+        "id": 3,
+        "category": "Data Quality",
+        "content": "Check missing values. Verify duplicates. Review null records. Validate mandatory fields before loading."
+    },
+    {
+        "id": 4,
+        "category": "File",
+        "content": "Verify file path. Confirm file exists. Check file permissions. Ensure source file is not corrupted."
+    },
+    {
+        "id": 5,
+        "category": "CSV Parsing",
+        "content": "Validate CSV delimiter. Check column count consistency. Remove malformed rows. Verify file encoding."
+    },
+    {
+        "id": 6,
+        "category": "Authentication",
+        "content": "Verify username and password. Check token expiration. Refresh credentials. Confirm access permissions."
+    },
+    {
+        "id": 7,
+        "category": "Network",
+        "content": "Check network connectivity. Verify DNS resolution. Review firewall settings. Test endpoint availability."
+    },
+    {
+        "id": 8,
+        "category": "Storage",
+        "content": "Check available disk space. Remove temporary files. Verify storage mount points. Monitor storage utilization."
+    },
+    {
+        "id": 9,
+        "category": "API",
+        "content": "Check API endpoint health. Review API limits. Validate request payload. Implement retry logic."
+    },
+    {
+        "id": 10,
+        "category": "Performance",
+        "content": "Review query execution time. Analyze bottlenecks. Process data in batches. Monitor CPU and memory usage."
+    },
+    {
+        "id": 11,
+        "category": "Data Type",
+        "content": "Verify column data types. Cast incompatible values. Check date formats. Validate numeric fields."
+    },
+    {
+        "id": 12,
+        "category": "Foreign Key",
+        "content": "Verify parent records exist. Load reference tables first. Validate foreign key relationships."
+    },
+    {
+        "id": 13,
+        "category": "Primary Key",
+        "content": "Check duplicate keys. Enforce uniqueness constraints. Deduplicate source records."
+    },
+    {
+        "id": 14,
+        "category": "Scheduler",
+        "content": "Verify scheduler service is running. Check cron configuration. Review job execution logs."
+    },
+    {
+        "id": 15,
+        "category": "Security",
+        "content": "Review SSL certificates. Verify encryption settings. Check security policies and access controls."
+    }
+]

@@ -1,11 +1,11 @@
 import sqlite3
 
+DB_PATH = "database/incidents.db"
+
 
 def create_table():
 
-    conn = sqlite3.connect(
-        "database/incidents.db"
-    )
+    conn = sqlite3.connect(DB_PATH)
 
     cursor = conn.cursor()
 
@@ -14,16 +14,19 @@ def create_table():
 
         id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-        error TEXT,
+        error TEXT NOT NULL,
 
-        category TEXT,
+        category TEXT NOT NULL,
+
+        cause TEXT,
+
+        fix TEXT,
 
         pipeline_name TEXT,
 
         status TEXT,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
     )
     """)
 
@@ -31,27 +34,36 @@ def create_table():
     conn.close()
 
 
-def save_incident(error, category):
+def save_incident(
+        error,
+        category,
+        cause,
+        fix
+):
 
-    conn = sqlite3.connect(
-        "database/incidents.db"
-    )
+    conn = sqlite3.connect(DB_PATH)
 
     cursor = conn.cursor()
 
     cursor.execute(
         """
         INSERT INTO incidents(
+
             error,
             category,
+            cause,
+            fix,
             pipeline_name,
             status
+
         )
-        VALUES (?,?,?,?)
+        VALUES(?,?,?,?,?,?)
         """,
         (
             error,
             category,
+            cause,
+            fix,
             "Customer_ETL",
             "FAILED"
         )
@@ -59,3 +71,51 @@ def save_incident(error, category):
 
     conn.commit()
     conn.close()
+
+
+def fetch_all_incidents():
+
+    conn = sqlite3.connect(DB_PATH)
+
+    conn.row_factory = sqlite3.Row
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT *
+        FROM incidents
+        """
+    )
+
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return rows
+
+
+def fetch_incident_by_id(
+        incident_id
+):
+
+    conn = sqlite3.connect(DB_PATH)
+
+    conn.row_factory = sqlite3.Row
+
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT *
+        FROM incidents
+        WHERE id = ?
+        """,
+        (incident_id,)
+    )
+
+    row = cursor.fetchone()
+
+    conn.close()
+
+    return row
