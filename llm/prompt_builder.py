@@ -92,15 +92,17 @@ Use the retrieved incidents and runbook whenever possible.
     # Runbook
     # ---------------------------------------------------------
 
-    def _format_runbook(self):
+    def _format_runbook(self) -> str:
+        """
+    Convert runbook dictionary into readable steps.
+        """
 
         if not self.runbook:
-
             return "No runbook available."
 
         title = self.runbook.get(
             "title",
-            "Retrieved Runbook"
+            "Unknown Runbook"
         )
 
         category = self.runbook.get(
@@ -108,20 +110,30 @@ Use the retrieved incidents and runbook whenever possible.
             "Unknown"
         )
 
-        content = self.runbook.get(
-            "content",
-            "No runbook available."
+        steps = self.runbook.get(
+            "steps",
+            []
         )
 
         text = (
             f"Runbook Title : {title}\n"
             f"Category : {category}\n\n"
-            f"Troubleshooting Guide:\n"
-            f"{content}"
+            "Troubleshooting Guide:\n"
         )
 
-        return text
+        if not steps:
+            text += "No runbook available."
 
+        else:
+
+            for index, step in enumerate(
+                steps,
+                start=1
+            ):
+
+                    text += f"{index}. {step}\n"
+
+        return text 
     # ---------------------------------------------------------
     # Build Prompt
     # ---------------------------------------------------------

@@ -5,10 +5,13 @@ from etl.transform import transform_data, validate_data
 from etl.load import load_data
 
 from classifier.classify import classify_error
-from db.database import create_table, save_incident
+from db.database import (
+    create_table,
+    save_incident
+)
 
-from parser.log_parser import parse_latest_error
-from llm.analyser import RCAAnalyzer
+from agent.graph import graph
+
 from reports.pdf_report import PDFReport
 
 
@@ -19,6 +22,10 @@ logging.basicConfig(
 )
 
 
+# ==========================================================
+# ETL PIPELINE
+# ==========================================================
+
 def run_pipeline():
 
     create_table()
@@ -27,7 +34,9 @@ def run_pipeline():
 
         logging.info("Extract Started")
 
-        df = extract_data("data/customers.csv")
+        df = extract_data(
+            "data/customers.csv"
+        )
 
         logging.info("Transform Started")
 
@@ -39,8 +48,7 @@ def run_pipeline():
 
         if errors:
 
-            print("\nPipeline Failed\n")
-            print("Errors Found:\n")
+            print("\n========== PIPELINE FAILED ==========\n")
 
             for error in errors:
 
@@ -48,12 +56,19 @@ def run_pipeline():
 
                 category = classify_error(error)
 
-                save_incident(error, category)
+                save_incident(
+                    error,
+                    category,
+                    "Unknown",
+                    "Pending Investigation"
+                    
+                )
 
-                print(f"Error: {error}")
-                print(f"Category: {category}\n")
+                print(f"Error    : {error}")
+                print(f"Category : {category}")
+                print("-" * 50)
 
-            print("All incidents saved to SQLite")
+            print("\nIncidents saved to SQLite.\n")
 
             return False
 
@@ -61,25 +76,11 @@ def run_pipeline():
 
         load_data(df)
 
-        print("\nPipeline Success\n")
+        logging.info("Pipeline Completed Successfully")
+
+        print("\n========== PIPELINE SUCCESS ==========\n")
 
         return True
-
-    except FileNotFoundError as e:
-
-        error = str(e)
-
-        logging.error(error)
-
-        category = classify_error(error)
-
-        save_incident(error, category)
-
-        print("\nPipeline Failed\n")
-        print(f"Error: {error}")
-        print(f"Category: {category}")
-
-        return False
 
     except Exception as e:
 
@@ -89,98 +90,166 @@ def run_pipeline():
 
         category = classify_error(error)
 
-        save_incident(error, category)
+        save_incident(
+            error,
+            category,
+            "Runtime Exception",
+            "Check application logs"
+        )
 
-        print("\nPipeline Failed\n")
-        print(f"Error: {error}")
-        print(f"Category: {category}")
+        print("\n========== PIPELINE FAILED ==========\n")
+        print(error)
 
         return False
 
 
-def run_investigation():
+# ==========================================================
+# LANGGRAPH RCA
+# ==========================================================
 
-    print("\n" + "=" * 70)
-    print("STARTING ETL FAILURE INVESTIGATION")
+def run_agent():
+
+    print("\n")
+    print("=" * 70)
+    print("STARTING LANGGRAPH INVESTIGATION")
     print("=" * 70)
 
-    latest_error = parse_latest_error("logs/pipeline.log")
+    initial_state = {
 
-    if latest_error is None:
+        "error": "",
 
-        print("No ETL errors found.")
-        return None
+        "incidents": [],
 
-    print(f"\nLatest Error:\n{latest_error}")
+        "runbook": {},
 
-    analyzer = RCAAnalyzer()
+        "history": [],
 
-    result = analyzer.analyze(latest_error)
+        "analysis": "",
 
-    pdf = PDFReport()
+        "confidence": "",
 
-    output_path = pdf.generate_report(
-        current_error=result["error"],
-        incidents=result["incidents"],
-        runbook=result["runbook"],
-        analysis=result["analysis"]
+        "pdf_path": ""
+
+    }
+
+    result = graph.invoke(
+        initial_state
     )
-
-    print(f"\nPDF Generated: {output_path}")
 
     return result
 
 
+# ==========================================================
+# PDF
+# ==========================================================
+
+def generate_pdf(result):
+
+    pdf = PDFReport()
+
+    output_path = pdf.generate_report(
+
+        current_error=result["error"],
+
+        incidents=result["incidents"],
+
+        runbook=result["runbook"],
+
+        analysis=result["analysis"]
+
+    )
+
+    return output_path
+
+
+# ==========================================================
+# SUMMARY
+# ==========================================================
+
+def print_summary(result, pdf_path):
+
+    print("\n")
+    print("=" * 70)
+    print("INVESTIGATION SUMMARY")
+    print("=" * 70)
+
+    print("\nCurrent Error")
+    print(result["error"])
+
+    print("\nHistorical Incidents")
+    print(len(result["incidents"]))
+
+    if result["runbook"]:
+
+        print("\nRunbook Category")
+        print(
+            result["runbook"].get(
+                "category",
+                "Unknown"
+            )
+        )
+
+    else:
+
+        print("\nRunbook")
+        print("Not Found")
+
+    print("\nConfidence")
+    print(result["confidence"])
+
+    print("\nLLM Root Cause Analysis\n")
+
+    print(result["analysis"])
+
+    print("\nPDF Report")
+
+    print(pdf_path)
+
+    print("\n")
+    print("=" * 70)
+    print("SYSTEM COMPLETED SUCCESSFULLY")
+    print("=" * 70)
+
+
+# ==========================================================
+# MAIN
+# ==========================================================
+
 def main():
 
+    print("\n")
     print("=" * 70)
     print("AGENTIC RAG ETL FAILURE ANALYSIS SYSTEM")
     print("=" * 70)
 
     print("\nRunning ETL Pipeline...\n")
 
-    pipeline_success = run_pipeline()
+    success = run_pipeline()
 
-    if pipeline_success:
-
-        print("\nPipeline completed successfully.")
-        print("No investigation required.")
-        return
-
-    print("\nRunning Investigation...\n")
-
-    result = run_investigation()
-
-    if result is None:
+    if success:
 
         print("\nNo investigation required.")
+
         return
 
-    print("\n" + "=" * 70)
-    print("INVESTIGATION SUMMARY")
-    print("=" * 70)
+    result = run_agent()
 
-    print(f"\nCurrent Error:\n{result['error']}")
-    print(f"\nHistorical Incidents Retrieved: {len(result['incidents'])}")
+    pdf_path = generate_pdf(
+        result
+    )
+    result["pdf_path"] = pdf_path
 
-    if result["runbook"]:
+    print_summary(
+        result,
+        pdf_path
+    )
+   
 
-        print(
-            f"Runbook Category: "
-            f"{result['runbook'].get('category', 'Unknown')}"
-        )
 
-    else:
-
-        print("Runbook: Not Found")
-
-    print("\nLLM Analysis\n")
-    print(result["analysis"])
-
-    print("\n" + "=" * 70)
-    print("SYSTEM COMPLETED SUCCESSFULLY")
-    print("=" * 70)
-
+# ==========================================================
+# ENTRY
+# ==========================================================
 
 if __name__ == "__main__":
+
     main()

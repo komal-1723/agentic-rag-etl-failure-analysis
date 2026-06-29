@@ -4,33 +4,20 @@ dashboard.py
 Agentic RAG ETL Failure Analysis Dashboard
 
 Run:
-
-streamlit run dashboard/dashboard.py
+    streamlit run dashboard/dashboard.py
 """
+
 import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
 import streamlit as st
 
-from parser.log_parser import (
-    parse_latest_error
-)
-
-from llm.analyser import (
-    RCAAnalyzer
-)
-
-from reports.pdf_report import (
-    PDFReport
-)
-
-# ----------------------------------------------------
-# Page Configuration
-# ----------------------------------------------------
+from agent.graph import graph
+from reports.pdf_report import PDFReport
 
 st.set_page_config(
     page_title="Agentic RAG ETL Dashboard",
@@ -38,212 +25,80 @@ st.set_page_config(
     layout="wide"
 )
 
-# ----------------------------------------------------
-# Sidebar
-# ----------------------------------------------------
-
 st.sidebar.title("Agentic RAG")
-
-st.sidebar.markdown("---")
-
-st.sidebar.write(
-    "Automatic ETL Failure Investigation"
-)
-
+st.sidebar.write("Automatic ETL Failure Investigation")
 run_button = st.sidebar.button(
     "Run Investigation",
     type="primary",
     use_container_width=True
 )
+st.sidebar.info("Reads latest ETL log using LangGraph.")
 
-st.sidebar.markdown("---")
-
-st.sidebar.info(
-    "Reads latest ETL log automatically."
-)
-
-# ----------------------------------------------------
-# Main Title
-# ----------------------------------------------------
-
-st.title(
-    "Agentic RAG System for ETL Failure Analysis"
-)
-
-st.caption(
-    "Automatic Root Cause Analysis using RAG + Llama 3"
-)
-
-st.markdown("---")
-
-# ----------------------------------------------------
-# Wait until user clicks
-# ----------------------------------------------------
+st.title("Agentic RAG System for ETL Failure Analysis")
+st.caption("LangGraph + ChromaDB + Llama 3")
+st.divider()
 
 if not run_button:
-
-    st.info(
-        "Click **Run Investigation** from the sidebar."
-    )
-
+    st.info("Click **Run Investigation**.")
     st.stop()
 
-# ----------------------------------------------------
-# Read Latest Error
-# ----------------------------------------------------
+with st.spinner("Running LangGraph Investigation..."):
+    state = {
+        "error": "",
+        "incidents": [],
+        "runbook": {},
+        "history": [],
+        "analysis": "",
+        "confidence": "",
+        "pdf_path": ""
+    }
+    result = graph.invoke(state)
 
-error = parse_latest_error(
-    "logs/pipeline.log"
-)
+st.success("Investigation Completed")
 
-if error is None:
+st.header("Current ETL Error")
+st.code(result["error"])
 
-    st.error(
-        "No ETL errors found in pipeline.log"
-    )
+st.divider()
 
-    st.stop()
-
-# ----------------------------------------------------
-# Run Analyzer
-# ----------------------------------------------------
-
-analyzer = RCAAnalyzer()
-
-with st.spinner(
-    "Investigating ETL Failure..."
-):
-
-    result = analyzer.analyze(
-        error
-    )
-
-st.success(
-    "Investigation Completed"
-)
-
-# ----------------------------------------------------
-# Current Error
-# ----------------------------------------------------
-
-st.header(
-    "Current ETL Error"
-)
-
-st.code(
-    result["error"]
-)
-
-st.markdown("---")
-
-# ----------------------------------------------------
-# Historical Incidents
-# ----------------------------------------------------
-
-st.header(
-    "Similar Historical Incidents"
-)
-
-incidents = result["incidents"]
-
-if incidents:
-
-    for index, incident in enumerate(
-        incidents,
-        start=1
-    ):
-
-        with st.expander(
-            f"Incident {index}"
-        ):
-
-            st.write(
-                f"**Category:** {incident.get('category','Unknown')}"
-            )
-
-            st.write(
-                f"**Error:** {incident.get('error','Unknown')}"
-            )
-
-            st.write(
-                f"**Root Cause:** {incident.get('cause','Unknown')}"
-            )
-
-            st.write(
-                f"**Fix:** {incident.get('fix','Unknown')}"
-            )
-
+st.header("Historical Incidents")
+if result["incidents"]:
+    for i, incident in enumerate(result["incidents"], start=1):
+        with st.expander(f"Incident {i}"):
+            st.write(f"**Category:** {incident.get('category','Unknown')}")
+            st.write(f"**Error:** {incident.get('error','Unknown')}")
+            st.write(f"**Root Cause:** {incident.get('cause','Unknown')}")
+            st.write(f"**Fix:** {incident.get('fix','Unknown')}")
 else:
+    st.warning("No historical incidents found.")
 
-    st.warning(
-        "No similar incidents found."
-    )
+st.divider()
 
-st.markdown("---")
-
-# ----------------------------------------------------
-# Runbook
-# ----------------------------------------------------
-
-st.header(
-    "Retrieved Runbook"
-)
-
+st.header("Retrieved Runbook")
 runbook = result["runbook"]
-
 if runbook:
-
-    st.write(
-        f"**Title:** {runbook.get('title','Unknown')}"
-    )
-
-    st.write(
-        f"**Category:** {runbook.get('category','Unknown')}"
-    )
-
-    st.markdown(
-        runbook.get(
-            "content",
-            "No runbook available."
-        )
-    )
-
+    st.write(f"**Title:** {runbook.get('title','Unknown')}")
+    st.write(f"**Category:** {runbook.get('category','Unknown')}")
+    st.markdown(runbook.get("content", "No content available."))
 else:
+    st.warning("No runbook retrieved.")
 
-    st.warning(
-        "No runbook found."
-    )
+st.divider()
 
-st.markdown("---")
-# ----------------------------------------------------
-# LLM Analysis
-# ----------------------------------------------------
-
-st.header(
-    "Root Cause Analysis"
-)
-
+st.header("Root Cause Analysis")
 st.text_area(
-    label="Llama 3 Output",
+    "Llama 3 Analysis",
     value=result["analysis"],
     height=350,
     disabled=True
 )
 
-st.markdown("---")
+st.divider()
 
-# ----------------------------------------------------
-# PDF Report
-# ----------------------------------------------------
-
-st.header(
-    "PDF Report"
-)
+st.header("PDF Report")
 
 pdf = PDFReport()
-
 try:
-
     output_file = pdf.generate_report(
         current_error=result["error"],
         incidents=result["incidents"],
@@ -251,77 +106,32 @@ try:
         analysis=result["analysis"]
     )
 
-    st.success(
-        "PDF Report Generated Successfully"
-    )
+    result["pdf_path"] = output_file
 
-    with open(
-        output_file,
-        "rb"
-    ) as pdf_file:
-
+    with open(output_file, "rb") as f:
         st.download_button(
-
-            label="Download PDF Report",
-
-            data=pdf_file,
-
+            "Download PDF Report",
+            data=f,
             file_name="ETL_FAILURE_REPORT.pdf",
-
             mime="application/pdf",
-
             use_container_width=True
-
         )
-
+    st.success("PDF generated successfully.")
 except Exception as e:
+    st.error(f"PDF generation failed: {e}")
 
-    st.error(
-        f"Unable to generate PDF.\n\n{e}"
-    )
+st.divider()
 
-st.markdown("---")
+st.header("Investigation Summary")
 
-# ----------------------------------------------------
-# Investigation Summary
-# ----------------------------------------------------
-
-st.header(
-    "Investigation Summary"
-)
-
-col1, col2 = st.columns(2)
-
-with col1:
-
-    st.metric(
-        "Incidents Retrieved",
-        len(result["incidents"])
-    )
-
-with col2:
-
-    if result["runbook"]:
-
-        st.metric(
-            "Runbook Retrieved",
-            "Yes"
-        )
-
-    else:
-
-        st.metric(
-            "Runbook Retrieved",
-            "No"
-        )
-
-st.markdown("---")
-
-# ----------------------------------------------------
-# Footer
-# ----------------------------------------------------
+c1, c2, c3 = st.columns(3)
+with c1:
+    st.metric("Incidents", len(result["incidents"]))
+with c2:
+    st.metric("Confidence", result["confidence"])
+with c3:
+    st.metric("History Records", len(result["history"]))
 
 st.caption(
-    "Agentic RAG System for ETL Failure Analysis | "
-    "Powered by ChromaDB • Sentence Transformers • Ollama • Llama 3 • Streamlit"
+    "Agentic RAG ETL Failure Analysis | LangGraph • ChromaDB • Ollama • Llama 3 • Streamlit"
 )

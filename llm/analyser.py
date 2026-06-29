@@ -1,29 +1,24 @@
 """
-analyzer.py
+analyser.py
 
-Coordinates the complete ETL Root Cause Analysis pipeline.
+RCA Analyzer
+
+Receives the already retrieved context from LangGraph.
 
 Flow
 
 Current Error
         ↓
-Retrieve Similar Incidents
+Historical Incidents
         ↓
-Retrieve Runbook
+Runbook
         ↓
-Build Prompt
+Prompt Builder
         ↓
 Llama 3
         ↓
-Return Structured Result
+Structured Result
 """
-
-from rag.retrieval import (
-    retrieve_similar_incidents,
-    retrieve_runbook,
-    format_incident_results,
-    format_runbook_results
-)
 
 from llm.prompt_builder import PromptBuilder
 from llm.ollama_client import OllamaClient
@@ -32,82 +27,142 @@ from llm.ollama_client import OllamaClient
 class RCAAnalyzer:
 
     def __init__(self):
+
         self.client = OllamaClient()
 
-    def analyze(self, error_text):
+    def analyze(
+        self,
+        error_text,
+        incidents,
+        runbook
+    ):
 
         print("\n" + "=" * 70)
         print("STARTING ROOT CAUSE ANALYSIS")
         print("=" * 70)
 
-        print("\nRetrieving similar incidents...")
+        print(f"\nUsing {len(incidents)} retrieved incident(s).")
 
-        incident_results = retrieve_similar_incidents(
-            error_text
-        )
+        if runbook:
 
-        incidents = format_incident_results(
-            incident_results
-        )
+            print(
+                f"Using runbook: "
+                f"{runbook.get('category', 'Unknown')}"
+            )
 
-        print(f"Retrieved {len(incidents)} incident(s).")
+        else:
 
-        print("\nRetrieving runbook...")
+            print("No runbook retrieved.")
 
-        runbook_results = retrieve_runbook(
-            error_text
-        )
-
-        runbooks = format_runbook_results(
-            runbook_results
-        )
-
-        print(f"Retrieved {len(runbooks)} runbook(s).")
-
-        # -----------------------------------------
+        # --------------------------------------------------
         # Convert incidents for Prompt Builder
-        # -----------------------------------------
+        # --------------------------------------------------
 
         prompt_incidents = []
 
         for incident in incidents:
 
             prompt_incidents.append(
+
                 {
-                    "category": incident.get("category", "Unknown"),
-                    "error": incident.get("error", ""),
-                    "root_cause": incident.get("cause", ""),
-                    "solution": incident.get("fix", "")
+
+                    "category":
+                        incident.get(
+                            "category",
+                            "Unknown"
+                        ),
+
+                    "error":
+                        incident.get(
+                            "error",
+                            ""
+                        ),
+
+                    "root_cause":
+                        incident.get(
+                            "cause",
+                            ""
+                        ),
+
+                    "solution":
+                        incident.get(
+                            "fix",
+                            ""
+                        )
+
                 }
+
             )
 
-        # -----------------------------------------
+        # --------------------------------------------------
         # Convert runbook
-        # -----------------------------------------
+        # --------------------------------------------------
 
-        if runbooks:
+        prompt_runbook = {}
 
-            runbook = {
-                "title": "Retrieved Runbook",
-                "category": runbooks[0].get("category", "Unknown"),
-                "content": runbooks[0].get("content", "")
+        if runbook:
+
+            content = runbook.get(
+                "content",
+                ""
+            )
+
+            if isinstance(content, str):
+
+                steps = [
+
+                    step.strip()
+
+                    for step in content.split(".")
+
+                    if step.strip()
+
+                ]
+
+            else:
+
+                steps = []
+
+            prompt_runbook = {
+
+                "title":
+                    runbook.get(
+                        "title",
+                        "Retrieved Runbook"
+                    ),
+
+                "category":
+                    runbook.get(
+                        "category",
+                        "Unknown"
+                    ),
+
+                "steps":
+                    steps
+
             }
 
-        else:
-
-            runbook = {}
-
-        # -----------------------------------------
+        # --------------------------------------------------
         # Build Prompt
-        # -----------------------------------------
+        # --------------------------------------------------
 
         builder = PromptBuilder(
+
             current_error=error_text,
+
             incidents=prompt_incidents,
-            runbook=runbook
+
+            runbook=prompt_runbook
+
         )
 
         prompt = builder.build()
+        
+        print("\n" + "=" * 70)
+        print("PROMPT SENT TO LLAMA 3")
+        print("=" * 70)
+        print(prompt)
+        print("=" * 70)
 
         print("\nSending prompt to Llama3...\n")
 
@@ -117,11 +172,7 @@ class RCAAnalyzer:
 
         print("Analysis completed successfully.")
 
-        # -----------------------------------------
-        # Return structured result
-        # -----------------------------------------
-
-        result = {
+        return {
 
             "error": error_text,
 
@@ -133,15 +184,65 @@ class RCAAnalyzer:
 
         }
 
-        return result
 
+# ----------------------------------------------------------
+# Test
+# ----------------------------------------------------------
 
 if __name__ == "__main__":
 
     analyzer = RCAAnalyzer()
 
+    incidents = [
+
+        {
+
+            "category": "Database",
+
+            "error": "Database timeout",
+
+            "cause": "VPN outage",
+
+            "fix": "Reconnect VPN"
+
+        },
+
+        {
+
+            "category": "Database",
+
+            "error": "Connection refused",
+
+            "cause": "Database server stopped",
+
+            "fix": "Restart database"
+
+        }
+
+    ]
+
+    runbook = {
+
+        "title": "Database Connectivity",
+
+        "category": "Database",
+
+        "content": (
+            "Verify VPN connection. "
+            "Check database server. "
+            "Restart ETL pipeline."
+        )
+
+    }
+
     result = analyzer.analyze(
-        "Unable to connect to database"
+
+        "Unable to connect to database",
+
+        incidents,
+
+        runbook
+
     )
 
     print("\n" + "=" * 70)
