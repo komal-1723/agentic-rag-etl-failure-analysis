@@ -27,6 +27,7 @@ def create_table():
         status TEXT,
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
     )
     """)
 
@@ -35,11 +36,30 @@ def create_table():
 
 
 def save_incident(
-        error,
-        category,
-        cause,
-        fix
+    error,
+    category,
+    cause="Unknown",
+    fix="Pending Investigation"
 ):
+    """
+    Saves an ETL incident.
+
+    Parameters
+    ----------
+    error : str
+        Error message.
+
+    category : str
+        Error category.
+
+    cause : str, optional
+        Root cause.
+        Defaults to "Unknown".
+
+    fix : str, optional
+        Recommended fix.
+        Defaults to "Pending Investigation".
+    """
 
     conn = sqlite3.connect(DB_PATH)
 
@@ -57,7 +77,7 @@ def save_incident(
             status
 
         )
-        VALUES(?,?,?,?,?,?)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
         (
             error,
@@ -85,6 +105,7 @@ def fetch_all_incidents():
         """
         SELECT *
         FROM incidents
+        ORDER BY id DESC
         """
     )
 
@@ -95,9 +116,7 @@ def fetch_all_incidents():
     return rows
 
 
-def fetch_incident_by_id(
-        incident_id
-):
+def fetch_incident_by_id(incident_id):
 
     conn = sqlite3.connect(DB_PATH)
 
